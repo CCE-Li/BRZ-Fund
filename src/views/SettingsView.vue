@@ -29,11 +29,13 @@ import { formatDateDisplay } from '@/utils/date';
 import { toErrorMessage } from '@/utils/errors';
 import { useToast } from '@/composables/useToast';
 import { useConfirm } from '@/composables/useConfirm';
+import { usePwaInstall } from '@/composables/usePwaInstall';
 
 const app = useAppStore();
 const finance = useFinanceStore();
 const toast = useToast();
 const { confirm } = useConfirm();
+const pwa = usePwaInstall();
 
 const THEME_OPTIONS = [
   { value: 'dark', label: '深色（默认）' },
@@ -48,6 +50,52 @@ const importPreview = ref<BackupValidationResult | null>(null);
 const importText = ref('');
 const persisted = ref<boolean | null>(null);
 const estimate = ref<StorageEstimateInfo>({ usageInBytes: null, quotaInBytes: null });
+const offlineReady = ref(false);
+
+const persistedText = computed(() => {
+  if (persisted.value === null) return '当前浏览器不支持查询';
+  return persisted.value ? '已获得（数据不易被自动清理）' : '未获得（浏览器可能在磁盘紧张时清理）';
+});
+
+const canInstallApp = computed(() => pwa.canInstall.value);
+const installedAsApp = computed(() => pwa.installed.value);
+
+async function refreshOfflineStatus(): Promise<void> {
+  if (!('serviceWorker' in navigator)) {
+    offlineReady.value = false;
+    return;
+  }
+  const registration = await navigator.serviceWorker.getRegistration();
+  offlineReady.value = registration?.active?.state === 'activated';
+}
+
+async function refreshStorageStatus(): Promise<void> {
+  busy.value = 'storage-status';
+  try {
+    persisted.value = await isStoragePersisted();
+    estimate.value = await estimateStorage();
+    await refreshOfflineStatus();
+    toast.info(persisted.value ? '已获得持久化存储许可。' : '尚未获得持久化存储许可。');
+  } finally {
+    busy.value = null;
+  }
+}
+
+async function onInstallApp(): Promise<void> {
+  const outcome = await pwa.promptInstall();
+  if (outcome === 'accepted') {
+    toast.success('已安装为应用。这也能提高浏览器授予持久化许可的概率。');
+    persisted.value = await isStoragePersisted();
+    return;
+  }
+  if (outcome === 'dismissed') {
+    toast.info('已取消安装。随时可以再来这里安装。');
+    return;
+  }
+  toast.warn(
+    '浏览器暂未提供安装入口。可以改用浏览器菜单里的「安装应用 / 添加到主屏幕」，或先收藏本页。',
+  );
+}
 
 const lastBackupText = computed(() =>
   app.lastBackupAt ? formatDateDisplay(app.lastBackupAt.slice(0, 10)) : '从未导出备份',
@@ -71,6 +119,7 @@ function formatBytes(value: number): string {
 onMounted(async () => {
   persisted.value = await isStoragePersisted();
   estimate.value = await estimateStorage();
+  await refreshOfflineStatus();
 });
 
 async function onThemeChange(value: string): Promise<void> {
@@ -206,11 +255,14 @@ async function onRequestPersist(): Promise<void> {
     persisted.value = await isStoragePersisted();
     estimate.value = await estimateStorage();
     if (granted === null) {
-      toast.warn('当前浏览器不支持申请持久化存储。');
+      toast.warn('当前浏览器不支持申请持久化存储许可。');
     } else if (granted) {
-      toast.success('已获得持久化存储许可，浏览器不会在磁盘紧张时自动清理数据。');
+      toast.success('已获得持久化存储许可：浏览器在磁盘紧张时不会自动清理本站数据。');
     } else {
-      toast.warn('浏览器未授予持久化许可，数据仍可能被自动清理，请定期导出备份。');
+      // Chrome / Edge 会依据「用户是否重视这个站点」自动判断，直接申请常被拒绝
+      toast.warn(
+        '浏览器暂未授予许可。可以先把本站安装为应用或加入书签，之后再回来申请，成功率高得多。',
+      );
     }
   } finally {
     busy.value = null;
@@ -252,16 +304,6 @@ async function onRequestPersist(): Promise<void> {
           <div class="settings__row">
             <span>当前货币单位</span>
             <span class="settings__value">{{ app.currency }}</span>
-          </div>
-          <div class="settings__row">
-            <span>占用空间 / 配额</span>
-            <span class="settings__value">{{ usageText }}</span>
-          </div>
-          <div class="settings__row">
-            <span>持久化存储许可</span>
-            <span class="settings__value">
-              {{ persisted === null ? '未知' : persisted ? '已获得' : '未获得' }}
-            </span>
           </div>
         </div>
 
@@ -337,22 +379,68 @@ async function onRequestPersist(): Promise<void> {
         </p>
       </BaseCard>
 
-      <BaseCard title="存储与危险操作" subtitle="删除前请先导出备份">
-        <div class="settings__danger">
-          <div>
-            <p class="settings__danger-title">申请持久化存储许可</p>
-            <p class="settings__note">
-              授予后浏览器在磁盘紧张时不会自动清理本站数据（你手动清理仍然会生效）。
-            </p>
-          </div>
+      <BaseCard title="存储与危险操作" subtitle="让数据更不易被浏览器清理">
+        <div class="settings__row">
+          <span>占用空间 / 配额</span>
+          <span class="settings__value">{{ usageText }}</span>
+        </div>
+        <div class="settings__row">
+          <span>持久化存储许可</span>
+          <span class="settings__value" :class="{ 'settings__value--warn': persisted === false }">
+            {{ persistedText }}
+          </span>
+        </div>
+        <div class="settings__row">
+          <span>应用安装状态</span>
+          <span class="settings__value">
+            {{ installedAsApp ? '已作为应用运行' : '在浏览器标签页中运行' }}
+          </span>
+        </div>
+        <div class="settings__row">
+          <span>离线可用</span>
+          <span class="settings__value">
+            {{ offlineReady ? '已缓存，可离线使用' : '尚未缓存完成' }}
+          </span>
+        </div>
+
+        <p class="settings__note">
+          浏览器不会随便授予持久化许可：Chrome / Edge 会依据「你是否重视这个站点」自动判断。
+          <strong>把它安装为应用、加入书签或反复访问</strong>之后再申请，成功率高得多。
+          即使拿到许可，手动清理浏览器数据仍会删除一切；许可只降低自动清理的风险。
+        </p>
+
+        <div class="settings__actions">
+          <BaseButton
+            v-if="canInstallApp"
+            variant="primary"
+            :loading="pwa.installing.value"
+            @click="onInstallApp"
+          >
+            安装为应用（推荐先做这一步）
+          </BaseButton>
           <BaseButton
             variant="secondary"
             :loading="busy === 'persist'"
             :disabled="persisted === true"
             @click="onRequestPersist"
           >
-            {{ persisted ? '已获得许可' : '申请持久化' }}
+            {{ persisted === true ? '已获得许可' : '申请持久化存储' }}
           </BaseButton>
+          <BaseButton
+            variant="ghost"
+            :loading="busy === 'storage-status'"
+            @click="refreshStorageStatus"
+          >
+            重新检查状态
+          </BaseButton>
+        </div>
+
+        <div
+          v-if="!canInstallApp && !installedAsApp"
+          class="settings__actions-note"
+        >
+          没有看到安装按钮？用地址栏右侧的安装图标，或浏览器菜单里的
+          「安装应用 / 添加到主屏幕」也可以。
         </div>
 
         <div class="settings__danger">
@@ -407,6 +495,17 @@ async function onRequestPersist(): Promise<void> {
 .settings__value {
   color: var(--text);
   font-variant-numeric: tabular-nums;
+}
+
+.settings__value--warn {
+  color: var(--warning);
+}
+
+.settings__actions-note {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  line-height: 1.7;
+  margin-top: var(--space-6, 32px);
 }
 
 .settings__actions {
