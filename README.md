@@ -124,17 +124,24 @@ npm run test:e2e      # 端到端验收（Playwright，首次需 npx playwright 
 
 - `tests/domain/`：余额聚合、分配额度、储蓄速度（含空月份）、预测（达成 / 零速 / 负速 / 超视界）、一致性审计、实体校验、Dashboard 视图模型。
 - `tests/services/`：真实走 fake-indexeddb 的收入到账原子性、重复入账拦截、分配超额拒绝、作废回退、机会状态机、初始化向导、备份导出导入与无效数据拒绝。
-- `tests/db/`：建库、迁移演练（v1→v2 保留数据）、事务失败整体回滚。
-- `tests/utils/`：金额定点运算、日期边界（闰年 / 月末）、CSV 转义。
+- `tests/db/`：建库、迁移演练（v1→v2 保留数据）、事务失败整体回滚、withTransaction 原子提交。
+- `tests/utils/`：金额定点运算与千分位解析、日期边界（闰年 / 月末 / 跨年）、CSV 转义。
 - `tests/components/`：UI 组件的渲染、格式化、状态类名与无障碍契约。
-- `e2e/`：真实浏览器中的初始化向导、设置持久化、主题切换与路由跳转。
+- `tests/composables/`：五张图表的数据构造（空数据、作废过滤、系列拼接、目标线）。
+- `e2e/`：真实浏览器中的验收流程，逐条对应 `docs/ACCEPTANCE.md` 的验收标准，
+  包括关闭浏览器后重新打开数据仍在（持久化上下文）、注入写入失败不误报成功等。
 
 > 已知工具链偏差：在 jsdom + Vite + Vue 3.5 组合下，SFC 编译出的原生事件处理器不会在合成事件中被调用（原生 `addEventListener` 正常，编译产物的处理器不触发）。因此组件测试只覆盖渲染与契约，**所有真实交互（表单输入、点击、刷新持久化）由 Playwright E2E 验证**，不在单测里伪造事件。
 
 ## 部署
 
-纯静态站点，`vite.config.ts` 使用相对 `base`，构建产物 `dist/` 可直接部署到任意静态托管（含 GitHub Pages 子路径）。仓库内置 `.github/workflows/deploy.yml`。
+纯静态站点：`vite.config.ts` 使用相对 `base`、路由使用 Hash 模式，因此构建产物 `dist/` 可部署到任意静态托管，
+包括 GitHub Pages 的子路径（如 `https://<user>.github.io/BRZ-Fund/`）。
+
+仓库内置 `.github/workflows/deploy.yml`：推送到 `main` 后自动执行
+类型检查 → 单元测试 → 构建 → 发布到 GitHub Pages。
+首次部署需要在仓库 Settings → Pages 中把 Source 设为 **GitHub Actions**。
 
 ## 后续计划
 
-月度复盘报告、收入来源效率分析、预测快照对比界面、PWA 离线安装、加密导出。
+月度复盘报告、收入来源效率分析（时薪/来源对比）、预测快照对比界面深化、PWA 离线安装、加密导出。
