@@ -118,13 +118,18 @@ src/
 ## 测试覆盖
 
 ```bash
-npm test
+npm test              # 单元 + 集成 + 组件测试（Vitest）
+npm run test:e2e      # 端到端验收（Playwright，首次需 npx playwright install chromium）
 ```
 
-- `tests/domain/`：余额聚合、分配额度、储蓄速度（含空月份）、预测（达成 / 零速 / 负速 / 超视界）、一致性审计、实体校验。
-- `tests/services/`：真实走 fake-indexeddb 的收入到账原子性、重复入账拦截、分配超额拒绝、作废回退、机会状态机、备份导出导入与无效数据拒绝。
+- `tests/domain/`：余额聚合、分配额度、储蓄速度（含空月份）、预测（达成 / 零速 / 负速 / 超视界）、一致性审计、实体校验、Dashboard 视图模型。
+- `tests/services/`：真实走 fake-indexeddb 的收入到账原子性、重复入账拦截、分配超额拒绝、作废回退、机会状态机、初始化向导、备份导出导入与无效数据拒绝。
 - `tests/db/`：建库、迁移演练（v1→v2 保留数据）、事务失败整体回滚。
 - `tests/utils/`：金额定点运算、日期边界（闰年 / 月末）、CSV 转义。
+- `tests/components/`：UI 组件的渲染、格式化、状态类名与无障碍契约。
+- `e2e/`：真实浏览器中的初始化向导、设置持久化、主题切换与路由跳转。
+
+> 已知工具链偏差：在 jsdom + Vite + Vue 3.5 组合下，SFC 编译出的原生事件处理器不会在合成事件中被调用（原生 `addEventListener` 正常，编译产物的处理器不触发）。因此组件测试只覆盖渲染与契约，**所有真实交互（表单输入、点击、刷新持久化）由 Playwright E2E 验证**，不在单测里伪造事件。
 
 ## 部署
 
