@@ -58,8 +58,16 @@ describe('StatCard', () => {
     const wrapper = mount(StatCard, {
       props: { label: 'l', value: 'v', tone: 'warning', size: 'lg' },
     });
-    expect(wrapper.classes()).toContain('stat--warning');
-    expect(wrapper.find('.stat__value--lg').exists()).toBe(true);
+    expect(wrapper.classes()).toContain('tile--warning');
+    expect(wrapper.classes()).toContain('tile--lg');
+  });
+
+  it('展示标签前的图标与数值后的单位', () => {
+    const wrapper = mount(StatCard, {
+      props: { label: 'l', value: '1,000', icon: 'wallet', unit: 'CNY' },
+    });
+    expect(wrapper.find('svg').exists()).toBe(true);
+    expect(wrapper.text()).toContain('CNY');
   });
 });
 
@@ -73,9 +81,19 @@ describe('ProgressBar', () => {
     expect(negative.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('0');
   });
 
-  it('按百分比渲染填充宽度', () => {
-    const wrapper = mount(ProgressBar, { props: { percent: 42 } });
-    expect(wrapper.get('.progress__fill').attributes('style')).toContain('width: 42%');
+  it('按百分比点亮对应数量的方块', () => {
+    const wrapper = mount(ProgressBar, { props: { percent: 42, blocks: 32 } });
+    // 42% × 32 ≈ 13 个点亮方块，其余为暗色轨道
+    expect(wrapper.findAll('.pbar__block')).toHaveLength(32);
+    expect(wrapper.findAll('.pbar__block--on')).toHaveLength(13);
+  });
+
+  it('0% 与 100% 的边界', () => {
+    const empty = mount(ProgressBar, { props: { percent: 0, blocks: 20 } });
+    expect(empty.findAll('.pbar__block--on')).toHaveLength(0);
+
+    const full = mount(ProgressBar, { props: { percent: 100, blocks: 20 } });
+    expect(full.findAll('.pbar__block--on')).toHaveLength(20);
   });
 });
 

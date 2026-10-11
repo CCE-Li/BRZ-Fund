@@ -15,7 +15,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -36,15 +36,15 @@ h4 {
 }
 
 h1 {
-  font-size: 20px;
+  font-size: 19px;
 }
 
 h2 {
-  font-size: 16px;
+  font-size: 14px;
 }
 
 h3 {
-  font-size: 14px;
+  font-size: 13px;
 }
 
 p {

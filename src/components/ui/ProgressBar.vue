@@ -1,33 +1,53 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+/**
+ * 分段进度条：参考图中「用量限额」的块状进度条。
+ * 填充块为亮色，剩余块为暗色轨道；块数固定，因此视觉上能一眼看出比例。
+ */
 const props = withDefaults(
   defineProps<{
     percent: number;
-    tone?: 'accent' | 'info' | 'warning' | 'danger';
+    tone?: 'accent' | 'info' | 'warning' | 'danger' | 'violet';
     label?: string;
     valueLabel?: string;
+    /** 方块数量。 */
+    blocks?: number;
+    /** 方块高度（px）。 */
     height?: number;
   }>(),
   {
     tone: 'accent',
     label: '',
     valueLabel: '',
-    height: 8,
+    blocks: 32,
+    height: 10,
   },
 );
 
 const clamped = computed(() => Math.max(0, Math.min(100, props.percent)));
+const filledBlocks = computed(() => Math.round((clamped.value / 100) * props.blocks));
+
+const toneVar = computed(() => {
+  const map: Record<string, string> = {
+    accent: 'var(--accent)',
+    info: 'var(--info)',
+    warning: 'var(--warning)',
+    danger: 'var(--danger)',
+    violet: 'var(--violet)',
+  };
+  return map[props.tone] ?? 'var(--accent)';
+});
 </script>
 
 <template>
-  <div class="progress">
-    <div v-if="label || valueLabel" class="progress__meta">
-      <span>{{ label }}</span>
-      <span class="progress__value">{{ valueLabel }}</span>
+  <div class="pbar">
+    <div v-if="label || valueLabel" class="pbar__meta">
+      <span class="pbar__label">{{ label }}</span>
+      <span class="pbar__value">{{ valueLabel }}</span>
     </div>
     <div
-      class="progress__track"
+      class="pbar__blocks"
       :style="{ height: `${height}px` }"
       role="progressbar"
       :aria-valuenow="clamped"
@@ -35,58 +55,58 @@ const clamped = computed(() => Math.max(0, Math.min(100, props.percent)));
       aria-valuemax="100"
       :aria-label="label || undefined"
     >
-      <div class="progress__fill" :class="`progress__fill--${tone}`" :style="{ width: `${clamped}%` }" />
+      <span
+        v-for="index in blocks"
+        :key="index"
+        class="pbar__block"
+        :class="{ 'pbar__block--on': index <= filledBlocks }"
+        :style="index <= filledBlocks ? { background: toneVar } : undefined"
+      />
     </div>
   </div>
 </template>
 
 <style scoped>
-.progress {
+.pbar {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--space-2);
   min-width: 0;
 }
 
-.progress__meta {
+.pbar__meta {
   display: flex;
+  align-items: center;
   justify-content: space-between;
+  gap: var(--space-3);
   font-size: 12px;
+}
+
+.pbar__label {
   color: var(--text-secondary);
 }
 
-.progress__value {
+.pbar__value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text);
   font-variant-numeric: tabular-nums;
 }
 
-.progress__track {
+.pbar__blocks {
+  display: flex;
+  gap: 2px;
   width: 100%;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-subtle);
-  border-radius: 999px;
-  overflow: hidden;
 }
 
-.progress__fill {
-  height: 100%;
-  background: var(--accent);
-  border-radius: 999px;
-  transition: width 300ms ease;
+.pbar__block {
+  flex: 1 1 0;
+  min-width: 1px;
+  background: var(--bg-track);
+  border-radius: 1px;
 }
 
-.progress__fill--accent {
-  background: var(--accent);
-}
-
-.progress__fill--info {
-  background: var(--info);
-}
-
-.progress__fill--warning {
-  background: var(--warning);
-}
-
-.progress__fill--danger {
-  background: var(--danger);
+.pbar__block--on {
+  opacity: 0.92;
 }
 </style>

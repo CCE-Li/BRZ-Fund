@@ -23,7 +23,7 @@ test('首次访问进入初始化向导，完成后显示 Dashboard 且刷新后
 
   // Dashboard：真实数据显示，余额从 0 开始
   await expect(page.getByRole('heading', { name: '总览' })).toBeVisible();
-  await expect(page.getByText('当前购车基金余额')).toBeVisible();
+  await expect(page.getByText('购车基金余额')).toBeVisible();
   await expect(page.getByText('¥0.00').first()).toBeVisible();
   await expect(page.getByText('¥68,000.00').first()).toBeVisible();
   await expect(page.getByText('数据不足，暂时无法可靠预测。')).toBeVisible();

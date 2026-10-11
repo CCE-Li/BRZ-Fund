@@ -20,11 +20,12 @@ defineProps<{
 <style scoped>
 .page-header {
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
   justify-content: space-between;
   gap: var(--space-4);
   flex-wrap: wrap;
-  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .page-header__titles {
@@ -32,14 +33,15 @@ defineProps<{
 }
 
 .page-header__title {
-  font-size: 22px;
+  font-size: 19px;
+  font-weight: 600;
   letter-spacing: -0.01em;
 }
 
 .page-header__subtitle {
   margin-top: 2px;
-  font-size: 13px;
-  color: var(--text-secondary);
+  font-size: 12px;
+  color: var(--text-tertiary);
 }
 
 .page-header__actions {
