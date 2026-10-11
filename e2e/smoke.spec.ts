@@ -86,7 +86,10 @@ test('主题切换与路由跳转可用', async ({ page }) => {
 
   const themeBefore = await page.evaluate(() => document.documentElement.dataset.theme);
   await page.getByRole('button', { name: '浅色主题' }).click();
-  expect(await page.evaluate(() => document.documentElement.dataset.theme)).not.toBe(themeBefore);
+  // 主题切换需要写入 IndexedDB 后才会应用到 DOM，使用可等待断言
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
+    .not.toBe(themeBefore);
 
   // 刷新后主题保留
   await page.reload();
@@ -94,10 +97,10 @@ test('主题切换与路由跳转可用', async ({ page }) => {
 
   // 路由跳转（各页面标题正确）
   await page.getByRole('link', { name: '机会' }).first().click();
-  await expect(page.getByRole('heading', { name: '收入机会' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '收入机会', level: 1 })).toBeVisible();
 
   await page.getByRole('link', { name: '预测' }).first().click();
-  await expect(page.getByRole('heading', { name: '购车预测' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '购车预测', level: 1 })).toBeVisible();
 
   // 未知路由 → 404 页面
   await page.goto('/#/definitely-not-a-page');

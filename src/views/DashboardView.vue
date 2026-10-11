@@ -14,16 +14,23 @@ import { useAppStore } from '@/stores/appStore';
 import { useFinanceStore } from '@/stores/financeStore';
 import {
   activeIncomes,
+  activeTransactions,
   openOpportunityCount,
   pendingPaymentOpportunities,
   totalNetIncome,
 } from '@/domain/dashboard';
 import { getSavingsWindow } from '@/domain/savingsRate';
-import { TRANSACTION_TYPE_LABELS } from '@/types/models';
+import { INCOME_SOURCE_LABELS, TRANSACTION_TYPE_LABELS } from '@/types/models';
 import type { ForecastSnapshot } from '@/types/models';
 import { compareForecastWithActual, calculateRequiredMonthlySaving } from '@/domain/forecast';
 import { formatDateDisplay, monthKeyToLabel } from '@/utils/date';
 import { formatMoney } from '@/utils/money';
+import {
+  buildFundGrowthOption,
+  buildIncomeSourceOption,
+  buildMonthlyTrendOption,
+} from '@/composables/chartOptions';
+import BaseChart from '@/components/charts/BaseChart.vue';
 
 const app = useAppStore();
 const finance = useFinanceStore();
@@ -106,6 +113,37 @@ const hasAuditIssues = computed(() => auditIssues.value.length > 0);
 
 const recentTransactions = computed(() => snapshot.value?.recentTransactions ?? []);
 const recentIncomes = computed(() => snapshot.value?.recentIncomes ?? []);
+
+const activeTransactionList = computed(() => activeTransactions(finance.transactions));
+
+const growthChartOption = computed(() =>
+  buildFundGrowthOption({
+    transactions: activeTransactionList.value,
+    goal: goal.value,
+    currency: app.currency,
+    locale: app.locale,
+  }),
+);
+
+const monthlyTrendOption = computed(() => {
+  const window = sixMonthWindow.value;
+  if (!window || window.entries.every((entry) => entry.income === 0 && entry.savings === 0)) return null;
+  return buildMonthlyTrendOption({ window, currency: app.currency, locale: app.locale });
+});
+
+const incomeSourceOption = computed(() => {
+  const totals = new Map<string, number>();
+  for (const income of activeIncomes(finance.incomes)) {
+    const label = INCOME_SOURCE_LABELS[income.source];
+    totals.set(label, (totals.get(label) ?? 0) + (income.amountReceived - income.directCosts));
+  }
+  if (totals.size === 0) return null;
+  return buildIncomeSourceOption({
+    items: Array.from(totals.entries()).map(([name, value]) => ({ name, value })),
+    currency: app.currency,
+    locale: app.locale,
+  });
+});
 
 function severityLabel(severity: 'error' | 'warning'): string {
   return severity === 'error' ? '数据错误' : '提醒';
@@ -330,6 +368,36 @@ function money(cents: number, currency = app.currency): string {
             </p>
             <p class="savings__note">{{ snapshotComparison.note }}</p>
           </div>
+        </BaseCard>
+      </div>
+
+      <BaseCard title="购车基金累计增长" subtitle="按实际记录逐月累计，虚线为目标金额">
+        <BaseChart
+          :option="growthChartOption.option"
+          :height="260"
+          :empty="activeTransactionList.length === 0"
+        />
+      </BaseCard>
+
+      <div class="grid grid--two">
+        <BaseCard title="每月收入与储蓄趋势" subtitle="最近 6 个完整月：到账收入 vs 转入购车基金">
+          <BaseChart
+            v-if="monthlyTrendOption"
+            :option="monthlyTrendOption"
+            :height="240"
+            empty-text="最近 6 个月还没有收入或储蓄记录"
+            :empty="!monthlyTrendOption"
+          />
+        </BaseCard>
+
+        <BaseCard title="收入来源构成" subtitle="按已到账净额统计，预计收入不计入">
+          <BaseChart
+            v-if="incomeSourceOption"
+            :option="incomeSourceOption"
+            :height="240"
+            empty-text="还没有到账收入记录"
+            :empty="!incomeSourceOption"
+          />
         </BaseCard>
       </div>
 
